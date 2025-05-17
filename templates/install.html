@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Installer & Emoji Converter</title>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet" />
+
+  <style>
+    /* Reset & Base */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #f0f4ff 0%, #d9e8ff 100%);
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .container {
+      max-width: 800px;
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      padding: 2rem;
+      position: relative;
+    }
+    h2 {
+      font-weight: 600;
+      font-size: 1.3rem;
+      margin-bottom: 1rem;
+      color: #1a202c;
+      text-align: center;
+    }
+    .btn {
+      display: inline-block;
+      text-decoration: none;
+      text-align: center;
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #fff;
+      background-color: #3182ce;
+      border-radius: 4px;
+      transition: background 0.2s ease;
+      margin-top: 1rem;
+    }
+    .btn:hover {
+      background-color: #2b6cb0;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+    }
+    label {
+      font-weight: 500;
+      margin-top: 1rem;
+      margin-bottom: 0.5rem;
+      color: #4a5568;
+    }
+    input[type="file"] {
+      font-size: 0.95rem;
+    }
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      user-select: none;
+      margin-top: 0.5rem;
+    }
+    input[type="checkbox"] {
+      width: 1.1rem;
+      height: 1.1rem;
+      accent-color: #3182ce;
+    }
+    .submit-btn {
+      margin-top: 1.5rem;
+    }
+
+    /* Loading overlay (shared) */
+    #loading-overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.3);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    .spinner {
+      width: 80px; height: 80px;
+      border: 10px solid #e2e8f0;
+      border-top-color: #3182ce;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .card { padding: 1rem; }
+      .btn, .submit-btn { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading overlay -->
+  <div id="loading-overlay" aria-live="assertive" aria-label="Loading">
+    <div class="spinner" role="status"><span class="sr-only">Loading…</span></div>
+  </div>
+
+  <div class="container">
+    <!-- Installer Card -->
+    <div class="card">
+      <h2>Install Desktop App</h2>
+      <p style="text-align: center; color: #4a5568;">
+        Download and install our Windows application to run image-to-emoji conversions locally.
+      </p>
+      <div style="text-align: center;">
+        <a href="/static/app_installer.exe" class="btn">Download & Install</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var forms = [
+        document.getElementById('emoji-form')
+      ];
+      var overlay = document.getElementById('loading-overlay');
+
+      forms.forEach(function(form) {
+        form.addEventListener('submit', function () {
+          overlay.style.display = 'flex';
+        });
+      });
+    });
+  </script>
+</body>
+</html>
