@@ -257,6 +257,7 @@ def image_to_emoji_art(image_path: str,
 
     return "\n".join(output)
 
+# TODO: Add command line argument parsing for better usability
 if __name__ == '__main__':
     # Prompt for image file path
     image_path = input("Enter the path to your image file: ").strip()
@@ -301,3 +302,4 @@ if __name__ == '__main__':
 </style></head><body><pre>{art}</pre></body></html>""")
 
     print(f"\n✅ Done! Your emoji art is saved as '{out_path}'.")
+    
