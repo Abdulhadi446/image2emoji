@@ -1,11 +1,16 @@
-import numpy as np
-from PIL import Image
+import math
 from collections import OrderedDict
 from multiprocessing import Pool
-from tqdm import tqdm
-import math
 
-LEGACY_PALETTE = {
+import numpy as np
+from PIL import Image
+from tqdm import tqdm
+from typing import Tuple, List, Set, Dict
+
+# ------------------------------------------------------------------------------
+# Legacy palette and corresponding emoji map
+# ------------------------------------------------------------------------------
+LEGACY_PALETTE: Dict[str, str] = {
     'darkcyan': '#0074BA',
     'dodgerblue': '#007ACF',
     'teal': '#008463',
@@ -91,7 +96,8 @@ LEGACY_PALETTE = {
     'papayawhip': '#FFEFD4',
     'white': '#FFFFFF',
 }
-EMOJI_MAP = {
+
+EMOJI_MAP: Dict[str, str] = {
     'darkcyan': '💙',
     'dodgerblue': '🦸',
     'teal': '🐢',
@@ -178,91 +184,130 @@ EMOJI_MAP = {
     'white': '⬜',
 }
 
-def hex_to_rgb(hex_str: str) -> tuple[int, int, int]:
+# ------------------------------------------------------------------------------
+# Utility functions
+# ------------------------------------------------------------------------------
+def hex_to_rgb(hex_str: str) -> Tuple[int, int, int]:
+    """Convert a hex color string (e.g. '#FFAABB') to an RGB tuple."""
     h = hex_str.lstrip('#')
     return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
 
-def color_distance_sq(c1: tuple[int, int, int], c2: tuple[int, int, int]) -> int:
+
+def color_distance_sq(c1: Tuple[int, int, int],
+                      c2: Tuple[int, int, int]) -> int:
+    """Compute squared Euclidean distance between two RGB colors."""
     return sum((a - b) ** 2 for a, b in zip(c1, c2))
 
+
 def nearest_legacy_color(hex_value: str) -> str:
+    """Find the name of the closest color in LEGACY_PALETTE."""
     target = hex_to_rgb(hex_value)
-    best_name, best_dist = None, math.inf
+    best_name: str = ''
+    best_dist: float = math.inf
     for name, hx in LEGACY_PALETTE.items():
         d = color_distance_sq(target, hex_to_rgb(hx))
         if d < best_dist:
             best_dist, best_name = d, name
     return best_name
 
+
 def hex2emoji(hex_value: str) -> str:
+    """Map a hex color to the nearest legacy emoji (or blank if missing)."""
     name = nearest_legacy_color(hex_value)
     return EMOJI_MAP.get(name, '⬜')
 
-def rgb_to_hex(rgb: tuple[int, int, int]) -> str:
+
+def rgb_to_hex(rgb: Tuple[int, int, int]) -> str:
+    """Convert an RGB tuple back to a hex color string."""
     return '#{:02X}{:02X}{:02X}'.format(*rgb)
 
-def process_block(args):
+
+# ------------------------------------------------------------------------------
+# Block processing for multiprocessing
+# ------------------------------------------------------------------------------
+def process_block(args: Tuple[np.ndarray, int, int, Set[Tuple[int, int]]]
+                  ) -> Tuple[int, int, str]:
     block, x, y, debug_positions = args
     avg_rgb = tuple(np.mean(block.reshape(-1, 3), axis=0).astype(int))
     hex_color = rgb_to_hex(avg_rgb)
     name = nearest_legacy_color(hex_color)
     emoji = EMOJI_MAP.get(name, '⬜')
-    # Debug print for selected blocks
     if (x, y) in debug_positions:
-        print(f"[DEBUG] Block ({x},{y}) avg={avg_rgb} hex={hex_color} → {name} → {emoji}")
+        print(f"[DEBUG] Block ({x},{y}) avg={avg_rgb} "
+              f"hex={hex_color} → {name} → {emoji}")
     return (y, x, emoji)
 
+
+# ------------------------------------------------------------------------------
+# Main conversion function
+# ------------------------------------------------------------------------------
 def image_to_emoji_art(image_path: str,
                        block_size: int = 12,
                        quantize: bool = True,
                        debug_samples: int = 3) -> str:
+    """
+    Convert an image to emoji art by dividing it into blocks,
+    computing the average color per block, and mapping to an emoji.
+    """
     img = Image.open(image_path).convert('RGB')
 
-    # Optionally quantize
     if quantize:
         img = img.quantize(colors=128).convert('RGB')
 
     arr = np.array(img)
     h, w, _ = arr.shape
 
-    # Pick a few random block origins to debug
-    ys = np.random.choice(range(0, h, block_size), size=debug_samples, replace=False)
-    xs = np.random.choice(range(0, w, block_size), size=debug_samples, replace=False)
+    ys = np.random.choice(range(0, h, block_size),
+                          size=min(debug_samples, h // block_size),
+                          replace=False)
+    xs = np.random.choice(range(0, w, block_size),
+                          size=min(debug_samples, w // block_size),
+                          replace=False)
     debug_positions = set(zip(xs, ys))
 
-    tasks = [
+    tasks: List[Tuple[np.ndarray, int, int, Set[Tuple[int, int]]]] = [
         (arr[y:y+block_size, x:x+block_size], x, y, debug_positions)
         for y in range(0, h, block_size)
         for x in range(0, w, block_size)
     ]
 
-    results = []
+    results: List[Tuple[int, int, str]] = []
     with Pool() as pool:
         for res in tqdm(pool.imap_unordered(process_block, tasks),
                         total=len(tasks),
                         desc="Processing blocks",
-                        unit=' Blocks'
-                        ):
+                        unit=" block"):
             results.append(res)
 
-    # Reassemble lines
-    lines_by_y = {}
+    # Reassemble lines by their Y coordinate
+    lines_by_y: Dict[int, List[Tuple[int, str]]] = {}
     for y, x, em in results:
         lines_by_y.setdefault(y, []).append((x, em))
 
-    output = []
+    output_lines: List[str] = []
     for y in sorted(lines_by_y):
         row = ''.join(em for x, em in sorted(lines_by_y[y]))
-        output.append(row)
+        output_lines.append(row)
 
-    return "\n".join(output)
+    return "\n".join(output_lines)
 
-def image2text(image_path: str, size_str: str, quantize_in: bool):
-    # Prompt for image file path
+
+# ------------------------------------------------------------------------------
+# CLI-style wrapper
+# ------------------------------------------------------------------------------
+def image2text(image_path: str,
+               size_str: str,
+               quantize_in: str) -> None:
+    """
+    Command-line interface for prompting user, running conversion,
+    and writing out an HTML file with the emoji art.
+    """
+    # Ensure valid image path
     while not image_path:
         print("  → Please enter a non-empty path.")
+        image_path = input("Image file path: ").strip()
 
-    # Prompt for block size
+    # Parse block size
     while True:
         if not size_str:
             block_size = 12
@@ -274,11 +319,12 @@ def image2text(image_path: str, size_str: str, quantize_in: bool):
             break
         except ValueError:
             print("  → Invalid input; please enter a positive integer.")
+            size_str = input("Block size (pixels): ").strip()
 
-    # Prompt whether to quantize
-    quantize = not (quantize_in == False)
+    # Parse quantization flag
+    quantize = not (quantize_in.lower() == False)
 
-    # Run the conversion
+    # Convert to emoji art
     art = image_to_emoji_art(
         image_path,
         block_size=block_size,
@@ -286,7 +332,7 @@ def image2text(image_path: str, size_str: str, quantize_in: bool):
         debug_samples=3
     )
 
-    # Save to HTML
+    # Write the result out as HTML
     out_path = "templates/emoji_art.html"
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(f"""<!DOCTYPE html>
